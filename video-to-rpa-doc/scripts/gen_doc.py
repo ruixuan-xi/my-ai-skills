@@ -50,13 +50,18 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 
 
-def set_cell_text(cell, text, size=Pt(9), bold=False):
-    """Safely set cell text, supporting multi-line via \\n."""
+def set_cell_text(cell, text, size=Pt(9), bold=False, alignment=None):
+    """Safely set cell text, supporting multi-line via \\n.
+    alignment: WD_ALIGN_PARAGRAPH.CENTER to center the text in the cell.
+    For WPS compatibility, uses w:ind (left indent) to manually push text to center
+    since WPS ignores w:jc and tab-stops in table data cells.
+    """
     for p in cell.paragraphs[1:]:
         p._element.getparent().remove(p._element)
     p = cell.paragraphs[0]
     for run in p.runs:
         run._element.getparent().remove(run._element)
+
     lines = text.split('\n')
     for i, line in enumerate(lines):
         if i > 0:
@@ -65,6 +70,35 @@ def set_cell_text(cell, text, size=Pt(9), bold=False):
         run = p.add_run(line)
         run.font.size = size
         run.font.bold = bold
+
+    if alignment == WD_ALIGN_PARAGRAPH.CENTER:
+        # 清空 pPr 重建（仅保留 w:ind 左缩进实现居中）
+        old_pPr = p._p.find(qn('w:pPr'))
+        if old_pPr is not None:
+            p._p.remove(old_pPr)
+        pPr = p._p.makeelement(qn('w:pPr'), {})
+        p._p.insert(0, pPr)
+
+        # 读取单元格宽度，计算文字近似宽度和左缩进
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcW = tcPr.find(qn('w:tcW'))
+        cell_w = int(tcW.get(qn('w:w'))) if tcW is not None else 1418
+
+        # 近似：单字符中文约 9pt → 180 twips；英文/数字约 5pt → 100 twips
+        # 取安全值：每个字符约 160 twips
+        visible_chars = sum(1 for c in text if c.strip())
+        if visible_chars == 0:
+            visible_chars = 1
+        est_text_w = min(visible_chars * 160, cell_w - 40)
+        indent_left = max(0, (cell_w - est_text_w) // 2)
+
+        if indent_left > 0:
+            ind = pPr.makeelement(qn('w:ind'), {
+                qn('w:left'): str(indent_left),
+                qn('w:leftChars'): str(int(indent_left / 100))
+            })
+            pPr.append(ind)
 
 
 def set_cell_shading(cell, fill_color):
@@ -321,10 +355,13 @@ def generate_doc(config):
     # --- Table 1: Systems ---
     t1 = doc.tables[1]
     systems = config.get('systems', [])
+    # 哪些列需要居中对齐（列索引从0开始）
+    center_cols = {3, 4, 5}  # 是否有密码、是否有验证码、最近有无升级计划 — 简短答案列居中
     for ri, vals in enumerate(systems):
         for ci, val in enumerate(vals):
             if ci < len(t1.columns):
-                set_cell_text(t1.rows[ri + 1].cells[ci], val)
+                align = WD_ALIGN_PARAGRAPH.CENTER if ci in center_cols else None
+                set_cell_text(t1.rows[ri + 1].cells[ci], val, alignment=align)
     # Remove extra rows: keep header + len(systems) data rows
     remove_extra_rows(t1, 1 + len(systems))
 
@@ -380,9 +417,8 @@ def generate_doc(config):
             print(f"  WARNING: step {idx+1} exceeds template rows, skipping")
             break
 
-        # 步骤号行：col0=步骤名称，col1/col2留空，加浅蓝背景
-        # 步骤名称直接使用 config 中的原始值，不自动加编号前缀
-        step_name = step.get('name', '')
+        # 步骤号行：col0=步骤名称，自动添加"步骤N："编号前缀
+        step_name = f"步骤{idx + 1}：{step.get('name', '')}"
         set_cell_text(t2.rows[r_title].cells[0], step_name, bold=True)
         set_cell_text(t2.rows[r_title].cells[1], '')
         set_cell_text(t2.rows[r_title].cells[2], '')
