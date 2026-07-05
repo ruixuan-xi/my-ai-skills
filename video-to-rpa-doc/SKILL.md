@@ -186,6 +186,12 @@ python "C:/Users/13251/.workbuddy/skills/video-to-rpa-doc/scripts/gen_doc.py" <o
 
 ### 7. 用 Draw.io 生成流程图
 
+> ⚠️ **强制规则（MUST）**：
+> 1. Word 文档生成后**必须**调用 **`Skill drawio`** 生成流程图，不允许省略此步骤。
+> 2. **严禁**再调用旧的 `scripts/gen_flowchart.py`（Mermaid 版本，已废弃）。
+> 3. 若因任何原因未能生成 `.drawio` 文件，必须在最终回复中显式向用户说明原因，不得静默跳过。
+> 4. 存在 `_flowchart.html` / `_flowchart.mmd` 等旧产物时必须先删除，避免混淆。
+
 Word 文档生成后，使用 **drawio** skill 自动生成可编辑的 Draw.io 业务流程图。
 
 **流程图命名规则：**
