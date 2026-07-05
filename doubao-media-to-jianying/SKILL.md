@@ -26,6 +26,7 @@ trigger:
 - `jianying_draft_composer.py` — 剪映草稿组合脚本
 - `.env` — API 密钥和计费单价配置（已预填用户密钥）
 - `.env.example` — 配置模板
+- `火山引擎密钥获取指南.md` — 如果还不知道怎么拿三个密钥，先看这个
 
 > Skill 运行时从 `{SKILL_DIR}` 加载模块和 `.env`，无需依赖外部路径。
 
@@ -34,9 +35,18 @@ trigger:
 
 已安装依赖：`volcengine-python-sdk[ark]`, `python-dotenv`, `requests`, `Pillow`, `pyJianYingDraft`, `opencv-python-headless`
 
-### 3. 剪映草稿目录
-从 `.env` 的 `JIANYING_DRAFT_PATH` 读取，默认值：`C:/Users/13251/AppData/Local/JianyingPro/User Data/Projects/com.lveditor.draft`
-（若用户剪映安装路径不同，修改 `.env` 即可）
+### 3. 剪映草稿目录 ⚠️ 重要
+
+**必须直接在剪映草稿目录下创建草稿**，这样剪映打开后直接就能看到项目，无需手动导入：
+
+```
+C:\Users\13251\AppData\Local\JianyingPro\User Data\Projects\com.lveditor.draft
+```
+
+- 此路径从 `.env` 的 `JIANYING_DRAFT_PATH` 读取
+- 若用户剪映安装路径不同，修改 `.env` 即可
+- **不要**将草稿创建在 skill 的 output 目录下，那只是中间产物，不是最终交付
+- 草稿创建后，打开剪映 → 「我的项目」即可看到
 
 ---
 
@@ -50,7 +60,6 @@ trigger:
 |------|------|------|--------|------|
 | topic | str | ✅ | — | 视频主题，如"量子力学""再别康桥" |
 | mode | str | ✅ | "image" | 素材模式，见下方说明 |
-| shot_count | int/None | ❌ | None | 分镜数量（None=AI自动决定，如诗词全文输出） |
 | draft_name | str | ❌ | 用主题命名 | 剪映草稿名称 |
 | add_image_movement | bool | ❌ | True | 图片是否添加运镜效果 |
 | add_video_movement | bool | ❌ | True | 视频是否添加运镜效果 |
@@ -87,12 +96,6 @@ AskUserQuestion:
       description: "AI生成动态视频片段，每条约1-3分钟，约 ¥1-4/条（4个分镜约¥5-15）"
 ```
 
-#### ⚠️ 关于 shot_count 参数
-
-- **默认为 None（AI自动决定）**：AI会根据主题内容自动确定分镜数。例如诗词会按句分行全文输出，产品会覆盖所有卖点。
-- 仅当用户明确指定数量时才传具体值（如"3个分镜"→shot_count=3）
-- 不要硬编码为5！
-
 #### 🎭 文案风格与视觉统一
 
 **文案讲究故事性**：
@@ -121,7 +124,6 @@ from volcengine_api import generate_media_pack, tracker
 
 result = generate_media_pack(
     topic="{topic}",
-    shot_count={shot_count},   # None=AI自动，或用户指定数字
     mode="{mode}",             # "image"（推荐）或 "video"
 )
 ```
@@ -157,7 +159,8 @@ subtitles = [s["subtitle"] for s in result["storyboard"]]
 audio_paths = [p for p in result["audio_paths"] if p is not None]
 media_paths = [p for p in result["media_paths"] if p is not None]
 
-# 剪映草稿目录（从 .env 读取）
+# ⚠️ 剪映草稿目录：必须用 JIANYING_DRAFT_PATH，不要在 output 目录下创建
+# 这样剪映打开后直接就能看到项目，无需手动导入
 import os
 from dotenv import load_dotenv
 load_dotenv(rf"{SKILL_DIR}/.env", override=True)
@@ -181,7 +184,7 @@ combo.create_jianying_draft_with_media(
 ```
 
 **注意**：
-- 如果剪映草稿目录不存在，检查 `.env` 中 `JIANYING_DRAFT_PATH` 是否正确
+- 如果剪映草稿目录不存在，检查 `.env` 中 `JIANYING_DRAFT_PATH` 是否正确配置为 `C:\Users\13251\AppData\Local\JianyingPro\User Data\Projects\com.lveditor.draft`
 - `subtitle_texts`、`audio_paths`、`media_paths` 三个列表长度必须一致
 - 如果某些分镜的音频/媒体生成失败（路径为 None），需要过滤掉对应的分镜
 
@@ -246,14 +249,14 @@ else:
 **用户**：图片模式
 
 **助手**：
-1. 调用 `generate_media_pack(topic="量子力学", shot_count=None, mode="image")`
+1. 调用 `generate_media_pack(topic="量子力学", mode="image")`
 2. 等待素材生成完成
 3. 调用 `create_jianying_draft_with_media(...)`
 4. 输出：剪映草稿"量子力学"创建成功！花费：¥1.29，用时：28.5秒
 
 **用户**：帮我生成再别康桥的剪映草稿
 
-**助手**：（诗词主题，AI会自动全文分镜，无需问shot_count）
-1. 调用 `generate_media_pack(topic="再别康桥", shot_count=None, mode="image")`
+**助手**：（诗词主题，AI会自动全文分镜）
+1. 调用 `generate_media_pack(topic="再别康桥", mode="image")`
 2. AI自动按诗句分镜，覆盖全文
 3. 输出结果

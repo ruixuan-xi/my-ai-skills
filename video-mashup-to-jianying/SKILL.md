@@ -41,6 +41,7 @@ trigger:
 - `jianying_draft_composer.py` — 剪映草稿组合脚本
 - `.env` — API 密钥和计费单价配置（已预填用户密钥）
 - `.env.example` — 配置模板
+- `火山引擎密钥获取指南.md` — 如果还不知道怎么拿三个密钥，先看这个
 
 > Skill 运行时从 `{SKILL_DIR}` 加载模块和 `.env`，无需依赖外部路径。
 
