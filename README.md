@@ -8,6 +8,7 @@ WorkBuddy AI Skills 集合仓库。
 |-------|------|
 | [doubao-media-to-jianying](./doubao-media-to-jianying/) | 输入主题，调用火山引擎API自动生成故事化分镜文案、TTS音频、风格统一的图片/视频素材，一键组合为剪映草稿 |
 | [railway-pdf-renamer](./railway-pdf-renamer/) | 铁路电子客票PDF批量重命名工具，自动提取日期、出发地、目的地、金额并重命名 |
+| [video-mashup-to-jianying](./video-mashup-to-jianying/) | 从本地视频素材中随机抽取片段，AI分析画面后生成连贯卖货脚本，自动配音并组合为剪映草稿 |
 | [video-to-rpa-doc](./video-to-rpa-doc/) | 视频 → 影刀RPA需求文档，提取音频ASR转录+关键帧分析，自动生成Word和Draw.io流程图 |
 
 ## 使用方式
