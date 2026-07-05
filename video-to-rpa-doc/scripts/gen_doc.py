@@ -452,25 +452,14 @@ def generate_doc(config):
 
 def regenerate_flowchart(config):
     """
-    Generate flowchart from the same config and return paths.
-    Call this after generate_doc() to also produce flowchart files.
+    DEPRECATED: The Mermaid-based gen_flowchart.py has been removed.
+    Flowcharts are now generated via the `drawio` skill instead
+    (see SKILL.md step 7). This stub is kept only to avoid
+    ImportError from any legacy caller.
     """
-    import importlib.util
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    flowchart_script = os.path.join(script_dir, 'gen_flowchart.py')
-    
-    # Determine output directory from the Word output path
-    word_output = config.get('output_path', '')
-    output_dir = os.path.dirname(word_output) if word_output else os.getcwd()
-    
-    if os.path.exists(flowchart_script):
-        spec = importlib.util.spec_from_file_location("gen_flowchart", flowchart_script)
-        gen_flowchart = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(gen_flowchart)
-        return gen_flowchart.generate_flowchart(config, output_dir)
-    else:
-        print(f"  WARNING: flowchart script not found at {flowchart_script}")
-        return None
+    print("  [DEPRECATED] regenerate_flowchart() is a no-op. "
+          "Use the `drawio` skill to generate flowcharts.")
+    return None
 
 
 if __name__ == '__main__':
@@ -480,6 +469,5 @@ if __name__ == '__main__':
     with open(sys.argv[1], 'r', encoding='utf-8') as f:
         config = json.load(f)
     generate_doc(config)
-    # Note: Mermaid flowchart generation has been replaced by ProcessOn.
-    # Use processon-diagram-generator skill to generate the flowchart instead.
-    # Keep regenerate_flowchart() as fallback for local Mermaid generation.
+    # Note: Mermaid flowchart generation has been fully removed.
+    # Use the `drawio` skill to generate the flowchart (see SKILL.md step 7).
