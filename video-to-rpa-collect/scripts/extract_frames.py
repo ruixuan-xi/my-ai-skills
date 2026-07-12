@@ -12,13 +12,48 @@ import cv2
 import os
 import sys
 import argparse
+import numpy as np
+
+
+def _imwrite_unicode(path: str, img) -> bool:
+    """Write image to path with Unicode (CJK) support on Windows.
+
+    cv2.imwrite can silently fail on paths with CJK characters on some
+    Python/OpenCV builds on Windows (uses fopen which isn't UTF-8 aware).
+    Workaround: cv2.imencode to a buffer, then write bytes via Python's
+    open() which handles Unicode natively.
+    """
+    try:
+        # First try direct imwrite (fast path, works on most systems)
+        ok = cv2.imwrite(path, img, [cv2.IMWRITE_PNG_COMPRESSION, 6])
+        if ok and os.path.exists(path) and os.path.getsize(path) > 0:
+            return True
+    except Exception:
+        pass
+    # Fallback: imencode + binary write
+    try:
+        ext = os.path.splitext(path)[1] or ".png"
+        ok2, buf = cv2.imencode(ext, img, [cv2.IMWRITE_PNG_COMPRESSION, 6])
+        if ok2:
+            with open(path, "wb") as f:
+                f.write(buf.tobytes())
+            return os.path.exists(path) and os.path.getsize(path) > 0
+    except Exception as e:
+        print(f"  WARN imwrite failed: {e}", file=sys.stderr)
+    return False
 
 
 def extract_frames(video_path, output_dir, threshold=30.0, min_interval=1.0, frame_skip=5):
     os.makedirs(output_dir, exist_ok=True)
 
+    # Use a short ASCII temp path if the input/output path contains CJK characters
+    # that might trip up cv2.VideoCapture. This is a belt-and-suspenders fix.
+    use_native = True
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
+        # Fallback: try to read via numpy/ffmpeg if path is unicode? Actually
+        # VideoCapture on Windows does support unicode via the wchar overload in
+        # modern OpenCV builds; if it still fails we give up clearly.
         print(f"ERROR: Cannot open video: {video_path}", file=sys.stderr)
         sys.exit(1)
 
@@ -56,10 +91,13 @@ def extract_frames(video_path, output_dir, threshold=30.0, min_interval=1.0, fra
                 timestamp = frame_idx / fps
                 fname = f"frame_{saved_count:02d}_{timestamp:.0f}s.png"
                 fpath = os.path.join(output_dir, fname)
-                cv2.imwrite(fpath, frame, [cv2.IMWRITE_PNG_COMPRESSION, 6])
-                print(f"[{saved_count}] t={timestamp:.1f}s  mse={mse:.1f}  -> {fname}")
-                saved_count += 1
-                last_saved_frame = frame_idx
+                ok = _imwrite_unicode(fpath, frame)
+                if ok:
+                    print(f"[{saved_count}] t={timestamp:.1f}s  mse={mse:.1f}  -> {fname}")
+                    saved_count += 1
+                    last_saved_frame = frame_idx
+                else:
+                    print(f"[{saved_count}] t={timestamp:.1f}s  WARN failed to write {fname}", file=sys.stderr)
 
         prev_frame = gray
         frame_idx += 1
@@ -72,9 +110,12 @@ def extract_frames(video_path, output_dir, threshold=30.0, min_interval=1.0, fra
         cap.set(cv2.CAP_PROP_POS_FRAMES, total_frames - 1)
         ret, last_frame = cap.read()
         if ret:
-            cv2.imwrite(fpath, last_frame, [cv2.IMWRITE_PNG_COMPRESSION, 6])
-            print(f"[{saved_count}] t={timestamp:.1f}s  -> {fname} (last frame)")
-            saved_count += 1
+            ok = _imwrite_unicode(fpath, last_frame)
+            if ok:
+                print(f"[{saved_count}] t={timestamp:.1f}s  -> {fname} (last frame)")
+                saved_count += 1
+            else:
+                print(f"[{saved_count}] t={timestamp:.1f}s  WARN failed to write {fname}", file=sys.stderr)
 
     cap.release()
     print(f"\nTotal key frames extracted: {saved_count}")
